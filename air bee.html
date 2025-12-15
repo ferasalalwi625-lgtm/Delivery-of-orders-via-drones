@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>AIRBEE – Smart Drone Delivery</title>
+
+<style>
+  body{margin:0;font-family:Arial,sans-serif;background:#f4f4f4}
+  header{background:#ffcc00;padding:12px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+  .brand{display:flex;align-items:center;gap:10px}
+  .brand img{height:42px;width:auto;border-radius:10px;background:#fff;padding:6px}
+  .brand .name{font-size:22px;font-weight:800;letter-spacing:.3px}
+  nav{display:flex;align-items:center;gap:12px}
+  nav a{color:#000;text-decoration:none;font-weight:800}
+  .cart-btn{position:relative;background:#000;color:#fff;border:none;border-radius:10px;padding:9px 12px;cursor:pointer;font-weight:800}
+  .cart-count{position:absolute;top:-7px;right:-7px;background:#ff3b30;color:#fff;border-radius:999px;padding:2px 7px;font-size:12px}
+
+  section{display:none;padding:26px}
+  section.active{display:block}
+
+  .hero{background:#fff;padding:34px;border-radius:14px;text-align:center;box-shadow:0 0 10px rgba(0,0,0,.06)}
+  .cards{display:flex;gap:18px;justify-content:center;margin-top:22px;flex-wrap:wrap}
+  .card{width:290px;max-width:100%;background:#fff;border-radius:14px;padding:18px;text-align:center;cursor:pointer;box-shadow:0 0 10px rgba(0,0,0,.08)}
+  .card img{width:90px}
+  .card h3{margin:10px 0 0}
+
+  .topbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+  .back{cursor:pointer;font-weight:800;text-decoration:underline}
+  .btn{border:none;border-radius:10px;padding:10px 12px;cursor:pointer;font-weight:800}
+  .btn-yellow{background:#ffcc00}
+  .btn-dark{background:#000;color:#fff}
+
+  .products{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+  @media (max-width:900px){.products{grid-template-columns:repeat(2,1fr)}}
+  @media (max-width:600px){.products{grid-template-columns:1fr}}
+  .product{background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 0 10px rgba(0,0,0,.06)}
+  .product img{width:100%;height:140px;object-fit:cover;display:block}
+  .product .pbody{padding:14px;text-align:center}
+  .product h4{margin:8px 0 6px}
+  .product p{margin:0 0 10px;color:#333}
+  .product button{width:100%}
+
+  .panel{background:#fff;border-radius:14px;padding:18px;box-shadow:0 0 10px rgba(0,0,0,.08);max-width:760px;margin:0 auto}
+  table{width:100%;border-collapse:collapse}
+  th,td{padding:10px;border-bottom:1px solid #eee;text-align:left}
+  .totalrow{display:flex;justify-content:space-between;font-weight:800;margin-top:10px;font-size:16px}
+  .note{color:#555;margin-top:8px;font-size:13px}
+
+  footer{background:#000;color:#fff;text-align:center;padding:14px;margin-top:24px}
+</style>
+
+<script>
+  // ✅ Fixed: make sure JS runs correctly and clicks work
+  var cart = [];
+  var deliveryFee = 1.000; // OMR
+
+  function showSection(id){
+    var sections = document.querySelectorAll("section");
+    for(var i=0;i<sections.length;i++){
+      sections[i].classList.remove("active");
+    }
+    var target = document.getElementById(id);
+    if(target){ target.classList.add("active"); }
+  }
+
+  function updateCartBadge(){
+    var count = 0;
+    for(var i=0;i<cart.length;i++){ count += cart[i].qty; }
+    var badge = document.getElementById("cartCount");
+    if(badge){ badge.innerText = count; }
+  }
+
+  function addToCart(name, price){
+    var found = null;
+    for(var i=0;i<cart.length;i++){
+      if(cart[i].name === name){ found = cart[i]; break; }
+    }
+    if(found){ found.qty += 1; }
+    else{ cart.push({name:name, price:price, qty:1}); }
+    updateCartBadge();
+    alert(name + " added to cart ✅");
+  }
+
+  function calcSubtotal(){
+    var sum = 0;
+    for(var i=0;i<cart.length;i++){
+      sum += (cart[i].price * cart[i].qty);
+    }
+    return sum;
+  }
+
+  function renderCart(){
+    var tbody = document.getElementById("cartBody");
+    if(!tbody) return;
+
+    tbody.innerHTML = "";
+
+    if(cart.length === 0){
+      tbody.innerHTML = '<tr><td colspan="4">Your cart is empty.</td></tr>';
+      document.getElementById("subTotal").innerText = "0.000 OMR";
+      document.getElementById("delivery").innerText = deliveryFee.toFixed(3) + " OMR";
+      document.getElementById("grandTotal").innerText = (0 + deliveryFee).toFixed(3) + " OMR";
+      document.getElementById("checkoutTotal").innerText = (0 + deliveryFee).toFixed(3) + " OMR";
+      return;
+    }
+
+    for(var idx=0; idx<cart.length; idx++){
+      var item = cart[idx];
+      var sub = item.price * item.qty;
+
+      tbody.innerHTML +=
+        '<tr>' +
+          '<td>' + item.name + '</td>' +
+          '<td>' + item.price.toFixed(3) + ' OMR</td>' +
+          '<td>' +
+            '<button class="btn btn-dark" onclick="changeQty(' + idx + ',-1)">-</button>' +
+            '<b style="margin:0 10px">' + item.qty + '</b>' +
+            '<button class="btn btn-yellow" onclick="changeQty(' + idx + ',1)">+</button>' +
+          '</td>' +
+          '<td>' +
+            sub.toFixed(3) + ' OMR' +
+            '<button class="btn btn-dark" style="margin-left:10px" onclick="removeItem(' + idx + ')">Remove</button>' +
+          '</td>' +
+        '</tr>';
+    }
+
+    var subtotal = calcSubtotal();
+    document.getElementById("subTotal").innerText = subtotal.toFixed(3) + " OMR";
+    document.getElementById("delivery").innerText = deliveryFee.toFixed(3) + " OMR";
+    document.getElementById("grandTotal").innerText = (subtotal + deliveryFee).toFixed(3) + " OMR";
+    document.getElementById("checkoutTotal").innerText = (subtotal + deliveryFee).toFixed(3) + " OMR";
+  }
+
+  function openCart(){
+    renderCart();
+    showSection("cart");
+  }
+
+  function changeQty(index, delta){
+    if(!cart[index]) return;
+    cart[index].qty += delta;
+    if(cart[index].qty <= 0){ cart.splice(index, 1); }
+    updateCartBadge();
+    renderCart();
+  }
+
+  function removeItem(index){
+    cart.splice(index, 1);
+    updateCartBadge();
+    renderCart();
+  }
+
+  function goCheckout(){
+    if(cart.length === 0){
+      alert("Cart is empty ❌");
+      return;
+    }
+    renderCart();
+    showSection("checkout");
+  }
+
+  function payNow(){
+    var visa = document.getElementById("payVisa").checked;
+    var mobile = document.getElementById("payMobile").checked;
+
+    if(!visa && !mobile){
+      alert("Please select a payment method ❗");
+      return;
+    }
+
+    cart = [];
+    updateCartBadge();
+
+    document.getElementById("successMsg").innerText =
+      "✅ Payment Successful!\nYour order will be delivered faster than the speed of sound 🚁⚡";
+
+    showSection("success");
+  }
+
+  window.onload = function(){
+    updateCartBadge();
+    showSection("home"); // ✅ ensure home is visible
+  };
+</script>
+</head>
+
+<body>
+
+<header>
+  <div class="brand">
+    <!-- Put your logo in same folder and name it: airbee-logo.png -->
+    <img src="airbee-logo.png" alt="AIRBEE Logo" onerror="this.style.display='none'">
+    <div class="name">AIRBEE</div>
+  </div>
+
+  <nav>
+    <a href="#" onclick="showSection('home');return false;">Home</a>
+    <button class="cart-btn" onclick="openCart();return false;">🛒 Cart
+      <span id="cartCount" class="cart-count">0</span>
+    </button>
+  </nav>
+</header>
+
+<!-- HOME -->
+<section id="home" class="active">
+  <div class="hero">
+    <h2>Smart Drone Delivery</h2>
+    <p>Restaurant • Hyper Market • Pharmacy</p>
+
+    <div class="cards">
+      <div class="card" onclick="showSection('restaurant')">
+        <img src="https://cdn-icons-png.flaticon.com/512/3075/3075977.png" alt="Restaurant">
+        <h3>Restaurant</h3>
+      </div>
+
+      <div class="card" onclick="showSection('market')">
+        <img src="https://cdn-icons-png.flaticon.com/512/869/869636.png" alt="Hyper Market">
+        <h3>Hyper Market</h3>
+      </div>
+
+      <div class="card" onclick="showSection('pharmacy')">
+        <img src="https://cdn-icons-png.flaticon.com/512/4320/4320337.png" alt="Pharmacy">
+        <h3>Pharmacy</h3>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- RESTAURANT -->
+<section id="restaurant">
+  <div class="topbar">
+    <div class="back" onclick="showSection('home')">← Back</div>
+    <h2>Restaurant Menu</h2>
+    <button class="btn btn-dark" onclick="openCart()">🛒 View Cart</button>
+  </div>
+
+  <div class="products">
+    <div class="product">
+      <img src="https://images.unsplash.com/photo-1550547660-d9450f859349?auto=format&fit=crop&w=800&q=60" alt="Burger">
+      <div class="pbody">
+        <h4>Burger</h4><p>2.000 OMR</p>
+        <button class="btn btn-yellow" onclick="addToCart('Burger',2.000)">Add to Cart</button>
+      </div>
+    </div>
+
+    <div class="product">
+      <img src="https://images.unsplash.com/photo-1542281286-9e0a16bb7366?auto=format&fit=crop&w=800&q=60" alt="Pizza">
+      <div class="pbody">
+        <h4>Pizza</h4><p>2.800 OMR</p>
+        <button class="btn btn-yellow" onclick="addToCart('Pizza',2.800)">Add to Cart</button>
+      </div>
+    </div>
+
+    <div class="product">
+      <img src="https://images.unsplash.com/photo-1585238342028-4c1f4a6e1d9a?auto=format&fit=crop&w=800&q=60" alt="Shawarma">
+      <div class="pbody">
+        <h4>Shawarma</h4><p>1.500 OMR</p>
+        <button class="btn btn-yellow" onclick="addToCart('Shawarma',1.500)">Add to Cart</button>
+      </div>
+    </div>
+
+    <div class="product">
+      <img src="https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=800&q=60" alt="Chicken Sandwich">
+      <div class="pbody">
+        <h4>Chicken Sandwich</h4><p>1.800 OMR</p>
+        <button class="btn btn-yellow" onclick="addToCart('Chicken Sandwich',1.800)">Add to Cart</button>
+      </div>
+    </div>
+
+    <div class="product">
+      <img src="https://images.unsplash.com/photo-1625944525533-473f1a3b1d3b?auto=format&fit=crop&w=800&q=60" alt="French Fries">
+      <div class="pbody">
+        <h4>French Fries</h4><p>0.900 OMR</p>
+        <button class="btn btn-yellow" onclick="addToCart('French Fries',0.900)">Add to Cart</button>
+      </div>
+    </div>
+
+    <div class="product">
+      <img src="https://images.unsplash.com/photo-1542444459-db47a65c0f81?auto=format&fit=crop&w=800&q=60" alt="Soft Drink">
+      <div class="pbody">
+        <h4>Soft Drink</h4><p>0.400 OMR</p>
+        <button class="btn btn-yellow" onclick="addToCart('Soft Drink',0.400)">Add to Cart</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- MARKET -->
+<section id="market">
+  <div class="topbar">
+    <div class="back" onclick="showSection('home')">← Back</div>
+    <h2>Hyper Market</h2>
+    <button class="btn btn-dark" onclick="openCart()">🛒 View Cart</button>
+  </div>
+
+  <div class="products">
+    <div class="product">
+      <img src="https://images.unsplash.com/photo-1580910051074-7eeb694dcf89?auto=format&fit=crop&w=800&q=60" alt="Milk">
+      <div class="pbody">
+        <h4>Milk</h4><p>0.700 OMR</p>
+        <button class="btn btn-yellow" onclick="addToCart('Milk',0.700)">Add to Cart</button>
+      </div>
+    </div>
+
+    <div class="product">
+      <img src="https://images.unsplash.com/photo-1604908177522-4029b5d64618?auto=format&fit=crop&w=800&q=60" alt="Rice">
+      <div class="pbody">
+        <h4>Rice</h4><p>1.500 OMR</p>
+        <button class="btn btn-yellow" onclick="addToCart('Rice',1.500)">Add to Cart</button>
+      </div>
+    </div>
+
+    <div class="product">
+      <img src="https://images.unsplash.com/photo-1615486364462-ef6363adf30b?auto=format&fit=crop&w=800&q=60" alt="Water Pack">
+      <div class="pbody">
+        <h4>Water (Pack)</h4><p>1.200 OMR</p>
+        <button class="btn btn-yellow" onclick="addToCart('Water (Pack)',1.200)">Add to Cart</button>
+      </div>
+    </div>
+
+    <div class="product">
+      <img src="https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=800&q=60" alt="Bread">
+      <div class="pbody">
+        <h4>Bread</h4><p>0.350 OMR</p>
+        <button class="btn btn-yellow" onclick="addToCart('Bread',0.350)">Add to Cart</button>
+      </div>
+    </div>
+
+    <div class="product">
+      <img src="https://images.unsplash.com/photo-1515003197210-e0cd71810b5f?auto=format&fit=crop&w=800&q=60" alt="Eggs">
+      <div class="pbody">
+        <h4>Eggs (12)</h4><p>1.100 OMR</p>
+        <button class="btn btn-yellow" onclick="addToCart('Eggs (12)',1.100)">Add to Cart</button>
+      </div>
+    </div>
+
+    <div class="product">
+      <img src="https://images.unsplash.com/photo-1547514701-42782101795e?auto=format&fit=crop&w=800&q=60" alt="Banana">
+      <div class="pbody">
+        <h4>Banana</h4><p>0.500 OMR</p>
+        <button class="btn btn-yellow" onclick="addToCart('Banana',0.500)">Add to Cart</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PHARMACY -->
+<section id="pharmacy">
+  <div class="topbar">
+    <div class="back" onclick="showSection('home')">← Back</div>
+    <h2>Pharmacy</h2>
+    <button class="btn btn-dark" onclick="openCart()">🛒 View Cart</button>
+  </div>
+
+  <div class="products">
+    <div class="product">
+      <img src="https://images.unsplash.com/photo-1580281657527-47aee3c6a93a?auto=format&fit=crop&w=800&q=60" alt="Paracetamol">
+      <div class="pbody">
+        <h4>Paracetamol</h4><p>1.000 OMR</p>
+        <button class="btn btn-yellow" onclick="addToCart('Paracetamol',1.000)">Add to Cart</button>
+      </div>
+    </div>
+
+    <div class="product">
+      <img src="https://images.unsplash.com/photo-1582719478185-2e92f1fef6c7?auto=format&fit=crop&w=800&q=60" alt="Vitamins">
+      <div class="pbody">
+        <h4>Vitamins</h4><p>2.200 OMR</p>
+        <button class="btn btn-yellow" onclick="addToCart('Vitamins',2.200)">Add to Cart</button>
+      </div>
+    </div>
+
+    <div class="product">
+      <img src="https://images.unsplash.com/photo-1588776814546-1ffcf47267a5?auto=format&fit=crop&w=800&q=60" alt="Bandage">
+      <div class="pbody">
+        <h4>Bandage</h4><p>0.600 OMR</p>
+        <button class="btn btn-yellow" onclick="addToCart('Bandage',0.600)">Add to Cart</button>
+      </div>
+    </div>
+
+    <div class="product">
+      <img src="https://images.unsplash.com/photo-1584017911766-d451b3d0e843?auto=format&fit=crop&w=800&q=60" alt="Hand Sanitizer">
+      <div class="pbody">
+        <h4>Hand Sanitizer</h4><p>0.900 OMR</p>
+        <button class="btn btn-yellow" onclick="addToCart('Hand Sanitizer',0.900)">Add to Cart</button>
+      </div>
+    </div>
+
+    <div class="product">
+      <img src="https://images.unsplash.com/photo-1583946099371-4a2b2f8e6f6c?auto=format&fit=crop&w=800&q=60" alt="Face Mask">
+      <div class="pbody">
+        <h4>Face Mask (Pack)</h4><p>0.800 OMR</p>
+        <button class="btn btn-yellow" onclick="addToCart('Face Mask (Pack)',0.800)">Add to Cart</button>
+      </div>
+    </div>
+
+    <div class="product">
+      <img src="https://images.unsplash.com/photo-1607619056574-7d8d3ee0d8f5?auto=format&fit=crop&w=800&q=60" alt="Cough Syrup">
+      <div class="pbody">
+        <h4>Cough Syrup</h4><p>1.700 OMR</p>
+        <button class="btn btn-yellow" onclick="addToCart('Cough Syrup',1.700)">Add to Cart</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CART -->
+<section id="cart">
+  <div class="topbar">
+    <div class="back" onclick="showSection('home')">← Back to Home</div>
+    <h2>Your Cart</h2>
+    <button class="btn btn-yellow" onclick="goCheckout()">Go to Checkout</button>
+  </div>
+
+  <div class="panel">
+    <table>
+      <thead>
+        <tr>
+          <th>Item</th>
+          <th>Price</th>
+          <th>Qty</th>
+          <th>Subtotal</th>
+        </tr>
+      </thead>
+      <tbody id="cartBody"></tbody>
+    </table>
+
+    <div class="totalrow"><span>Subtotal</span><span id="subTotal">0.000 OMR</span></div>
+    <div class="totalrow"><span>Delivery Fee</span><span id="delivery">1.000 OMR</span></div>
+    <div class="totalrow" style="font-size:18px"><span>Total</span><span id="grandTotal">1.000 OMR</span></div>
+  </div>
+</section>
+
+<!-- CHECKOUT -->
+<section id="checkout">
+  <div class="topbar">
+    <div class="back" onclick="openCart()">← Back to Cart</div>
+    <h2>Checkout</h2>
+  </div>
+
+  <div class="panel" style="max-width:520px">
+    <h3>Order Total: <span id="checkoutTotal">0.000 OMR</span></h3>
+
+    <h4>Payment Method</h4>
+    <label><input id="payVisa" type="radio" name="pay"> Visa / MasterCard</label><br><br>
+    <label><input id="payMobile" type="radio" name="pay"> Mobile Payment</label>
+
+    <button class="btn btn-yellow" style="width:100%;margin-top:16px" onclick="payNow()">Pay Now</button>
+    <div class="note">After payment, you will receive a confirmation message.</div>
+  </div>
+</section>
+
+<!-- SUCCESS -->
+<section id="success">
+  <div class="panel" style="max-width:560px;text-align:center;margin-top:30px">
+    <h2>Thank You!</h2>
+    <pre id="successMsg" style="white-space:pre-wrap;font-size:16px;margin:12px 0"></pre>
+    <button class="btn btn-dark" onclick="showSection('home')">Back to Home</button>
+  </div>
+</section>
+
+<footer>© 2025 AIRBEE – Smart Drone Delivery</footer>
+
+</body>
+</html>
